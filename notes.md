@@ -62,14 +62,57 @@ sp.call("ifconfig " + interface + " up ", shell=True)
 One drawback of the code above is that it is not secure since we allow users to input anything.  For example a user can enter the follwing when prompted to enter the interface.
 > Enter interface: eth0; ls;
 
-The variable **interface** will hold the string "eth0; ls;" when the program is run, ls will list the files and folders in the current directory. The semi-colon is used to execute a new command.
+The variable **interface** will hold the string "eth0; ls;" when the program is run, ls will list the files and folders in the current directory. The semi-colon is used to execute a new command,hence the above code is not secure.
 
-To make it secure, use the following code
+To make it secure, the argument of the function ***call*** should be a list. he following code illustrates the security measure.
 ```python
 import subprocess as sp
 
 interface = input("Enter the interace: ")
 new_mac = input("Enter new MAC address: ")
+
+print(f"[+] Changing MAC address for {interface} to {new_mac}")
+
+sp.call(["ifconfig", interface, "down"])
+sp.call(["ifconfig", interface, "hw", "ether", new_mac])
+sp.call(["ifconfig", interface, "up"])
+```
+
+# Handling Command-line arguments
+Use the module ***optparse*** to handle command line arguments.
+
+Optparse seems like a pretty cool module for processing command line options and arguments in Python. It is intended to be an improvement over the old getopt module. Optparse supports short style options like -x, long style options like --xhtml and positional arguments. Optparse also makes it easy to add default options and help text. For more information, see the [optparse documentation](https://docs.python.org/3/library/optparse.html)
+### Example
+```python 
+from optparse import OptionParser
+import subprocess as sp
+
+parser = OptionParser()
+parser.add_option("-i", "--interface", dest="interface", help="Interface to change MAC address.")
+parser.add_option("-m", "--mac", dest="new_mac", help="New MAC address.")
+
+(options, args) = parser.parse_args()
+```
+
+
+
+
+Applying it to the MAC address changer, we have 
+```python
+#!/usr/bin/env python3
+
+from optparse import OptionParser
+import subprocess as sp
+
+parser = OptionParser()
+parser.add_option("-i", "--interface", dest="interface", help="Interface to change MAC address.")
+parser.add_option("-m", "--mac", dest="new_mac", help="New MAC address.")
+
+(options, args) = parser.parse_args()
+
+
+interface = options.interface
+new_mac = options.new_mac
 
 print(f"[+] Changing MAC address for {interface} to {new_mac}")
 

@@ -9,7 +9,7 @@ parser.add_option("-m", "--mac", dest="new_mac", help="New MAC address.")
 
 (options, args) = parser.parse_args()
 
-
+# Initializing variables.
 interface = options.interface
 new_mac = options.new_mac
 

@@ -219,4 +219,32 @@ else:
 
 ```
 
+# Section 4:  Programming a Network Scanner
+Information gathering is one of the most important steps in hacking or penetration testing.
+
+## Network Scanner
+Network scanning helps to 
+- ***Discover*** all devices on the network
+- Display their ***IP address***
+- Display their ***MAC address***
+> Some tools for network scanning are *Nmap* and *netdiscover*
+
+We will use ***netdiscover***
+
+## Introduction to ARP (Address Resolution Protocol)
+***ARP*** is a protocol that a device A uses to communicate with another devices B. Device A will send an ARP request to all devices
+on the network asking which one has IP address IP_B. Device B has responds and sends back its MAC address to device A. This establishes a medium for communication
+between devices A and B. The ARP is responsible for resolving the IP_B to the MAC address of device B.
+
+To implement the APR, we use a the python module called ***scapy***
+
+```python
+import scapy.all as scapy
+
+def scan(ip):
+    scapy.arping(ip)
+```
+
+
+
 

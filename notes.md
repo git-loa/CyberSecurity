@@ -236,7 +236,7 @@ We will use ***netdiscover***
 on the network asking which one has IP address IP_B. Device B has responds and sends back its MAC address to device A. This establishes a medium for communication
 between devices A and B. The ARP is responsible for resolving the IP_B to the MAC address of device B.
 
-To implement the APR, we use a the python module called ***scapy***
+To implement the APR, we use a the python module called ***scapy*** See the [Scapy Documentaion](https://scapy.readthedocs.io/en/latest/index.html)
 
 ```python
 import scapy.all as scapy
@@ -245,6 +245,15 @@ def scan(ip):
     scapy.arping(ip)
 ```
 
+## Network Scanner Algorithm 
+> The goal of this algoritm is to discover all clients on a network
 
+#### Steps in the algorithm
+1. Create an ARP request directed to braodcast MAC address asking for IP
+    - Use ARP to ask whi has target IP
+    - Set destination MAC to broadcasr MAC
+2. Send packet and receive response
+3. Parse the responce
+4. Print result
 
 

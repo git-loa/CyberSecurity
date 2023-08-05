@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from optparse import OptionParser
 import scapy.all as scapy
 
@@ -25,7 +27,7 @@ def scan(ip) -> list:
         
     return client_list
 
-def print_result(result_list):
+def print_result(result_list) -> None:
     for client in result_list:
         print(client)
 

@@ -20,13 +20,12 @@ def process_packet(packet):
             scapy_packet[scapy.DNS].an = answer
             scapy_packet[scapy.DNS].ancount = 1
 
-            # delete the len and chkcum in the IP and UDP layers
-            # to prevent corruption  our modified data
+            # delete the len and chksum in the IP and UDP layers
+            # to prevent corruption  of our modified data
             del scapy_packet[scapy.IP].len
             del scapy_packet[scapy.IP].chksum
             del scapy_packet[scapy.UDP].len
             del scapy_packet[scapy.UDP].chksum
-
             packet.set_payload(bytes(scapy_packet))
 
 

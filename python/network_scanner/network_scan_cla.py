@@ -15,7 +15,6 @@ def get_commd_line_arg() -> str:
     return option.ip_range
 
 def scan(ip) -> list:
-  
     arp_request = scapy.ARP(pdst = ip)
     broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
     arp_request_broadcast = broadcast/arp_request

